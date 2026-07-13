@@ -76,6 +76,15 @@ class AwgVpnService : VpnService() {
             try {
                 if (handle != -1) return
                 payload = cfg
+                // Config summary — deliberately excludes "uapi" (private key).
+                logd(
+                    "connect id=${cfg.optString("id")} name=${cfg.optString("name")} " +
+                        "mtu=${cfg.optInt("mtu", 1280)} dns=${cfg.optJSONArray("dns")} " +
+                        "routes=${cfg.optJSONArray("routes")?.length()} " +
+                        "peerCount=${cfg.optInt("peerCount", 1)} " +
+                        "routingMode=${cfg.optString("routingMode")} " +
+                        "apps=${cfg.optJSONArray("apps")?.length() ?: 0}",
+                )
                 AwgVpnState.update("connecting", id = cfg.optString("id"))
 
                 val tunFd = establishTun(cfg) ?: run {
@@ -99,9 +108,9 @@ class AwgVpnService : VpnService() {
                 running = true
                 registerNetworkCallback()
                 startPoller(cfg.optString("id"))
-                Log.i(TAG, "Tunnel up: ${GoBackend.awgVersion()}")
+                logd("tunnel up: ${GoBackend.awgVersion()}")
             } catch (e: Throwable) {
-                Log.e(TAG, "connect failed", e)
+                loge("connect failed", e)
                 AwgVpnState.update("error", error = e.message ?: "connect failed")
                 stopSelf()
             }
@@ -149,10 +158,16 @@ class AwgVpnService : VpnService() {
             builder.allowFamily(OsConstants.AF_INET6)
         }
 
-        builder.setMtu(cfg.optInt("mtu", 1280))
+        val mtu = cfg.optInt("mtu", 1280)
+        builder.setMtu(mtu)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) builder.setMetered(false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) setUnderlyingNetworks(null)
         builder.setBlocking(true)
+
+        logd(
+            "tun mtu=$mtu defaultRoute=$sawDefaultRoute peerCount=$peerCount " +
+                "killSwitch=${sawDefaultRoute && peerCount == 1}",
+        )
 
         val pfd = builder.establish() ?: return null
         tun = pfd
@@ -163,14 +178,29 @@ class AwgVpnService : VpnService() {
         val gen = ++generation
         poller = Thread({
             var connectedReported = false
+            var prevRx = 0L
+            var prevTx = 0L
+            // Wall-clock of the last time downlink (rx) actually advanced, used to
+            // spot a "video frozen" stall: uplink keeps moving (requests /
+            // retransmits) while nothing comes back.
+            var lastRxProgressMs = System.currentTimeMillis()
+            var rxStallReported = false
             while (running && gen == generation && !Thread.currentThread().isInterrupted) {
                 val stats = readStats()
                 if (stats == null) {
-                    sleep(2000); continue
+                    sleep(POLL_MS); continue
                 }
                 val (rx, tx, hs) = stats
-                val nowSec = System.currentTimeMillis() / 1000
+                val nowMs = System.currentTimeMillis()
+                val nowSec = nowMs / 1000
                 val age = if (hs > 0) nowSec - hs else Long.MAX_VALUE
+                val drx = rx - prevRx
+                val dtx = tx - prevTx
+                if (drx > 0) {
+                    lastRxProgressMs = nowMs
+                    rxStallReported = false
+                }
+                val rxIdleMs = nowMs - lastRxProgressMs
 
                 if (hs > 0) {
                     if (!connectedReported) {
@@ -182,13 +212,38 @@ class AwgVpnService : VpnService() {
                     AwgVpnState.update("connecting", id, rx, tx, 0)
                 }
 
+                if (BuildConfig.DEBUG) {
+                    logd(
+                        "poll rx=$rx(+$drx) tx=$tx(+$dtx) " +
+                            "hsAge=${if (age == Long.MAX_VALUE) "-" else "${age}s"} " +
+                            "rxIdle=${rxIdleMs / 1000}s",
+                    )
+                    // The signature of a YouTube-style hang: we're still sending
+                    // (dtx > 0) but the downlink has been dead for a while and the
+                    // handshake is still fresh (so it's NOT a dead tunnel — likely
+                    // an MTU/path-MSS blackhole dropping large packets).
+                    if (connectedReported && !rxStallReported && dtx > 0 && drx == 0L &&
+                        rxIdleMs > RX_STALL_MS && age < STALL_SECONDS
+                    ) {
+                        rxStallReported = true
+                        logw(
+                            "RX-STALL: downlink frozen ${rxIdleMs / 1000}s while uplink " +
+                                "active (+$dtx tx), handshake fresh (${age}s). " +
+                                "Classic MTU/MSS blackhole — video buffering will hang.",
+                        )
+                    }
+                }
+
                 // Stall detection: healthy handshakes refresh every ~2 min.
                 if (connectedReported && age != Long.MAX_VALUE && age > STALL_SECONDS) {
-                    Log.w(TAG, "Handshake stale (${age}s) — reconnecting")
-                    scheduleRestart()
+                    logw("handshake stale (${age}s) — reconnecting")
+                    scheduleRestart("handshake-stale-${age}s")
                     return@Thread
                 }
-                sleep(2000)
+
+                prevRx = rx
+                prevTx = tx
+                sleep(POLL_MS)
             }
         }, "AwgPoller").also { it.start() }
     }
@@ -211,9 +266,10 @@ class AwgVpnService : VpnService() {
         return Triple(rx, tx, hs)
     }
 
-    private fun scheduleRestart() {
+    private fun scheduleRestart(reason: String) {
         if (!running) return
         if (!restarting.compareAndSet(false, true)) return
+        logw("scheduleRestart reason=$reason")
         AwgVpnState.update("reconnecting", id = payload?.optString("id"))
         updateNotification("Переподключение…")
         Thread({
@@ -247,14 +303,15 @@ class AwgVpnService : VpnService() {
             override fun onAvailable(network: Network) {
                 // The first callback fires for the network we came up on.
                 if (first) { first = false; return }
-                if (running) scheduleRestart()
+                logd("underlying network changed: $network")
+                if (running) scheduleRestart("network-changed")
             }
         }
         netCallback = cb
         try {
             cm.registerNetworkCallback(request, cb)
         } catch (e: Exception) {
-            Log.w(TAG, "network callback registration failed", e)
+            logw("network callback registration failed", e)
             netCallback = null
         }
     }
@@ -373,6 +430,21 @@ class AwgVpnService : VpnService() {
         Thread.currentThread().interrupt()
     }
 
+    // ── debug-only logging ───────────────────────────────────────────────
+    // Every call is compiled to run only in debug builds; in release the guard
+    // short-circuits before any string is built, so logging is fully inert.
+    private fun logd(msg: String) {
+        if (BuildConfig.DEBUG) Log.d(TAG, msg)
+    }
+
+    private fun logw(msg: String, e: Throwable? = null) {
+        if (BuildConfig.DEBUG) Log.w(TAG, msg, e)
+    }
+
+    private fun loge(msg: String, e: Throwable? = null) {
+        if (BuildConfig.DEBUG) Log.e(TAG, msg, e)
+    }
+
     companion object {
         private const val TAG = "Osmira/Vpn"
         const val ACTION_CONNECT = "osmi.awg2.CONNECT"
@@ -381,5 +453,9 @@ class AwgVpnService : VpnService() {
         private const val CHANNEL_ID = "osmira_vpn"
         private const val NOTIF_ID = 1001
         private const val STALL_SECONDS = 180L
+        private const val POLL_MS = 2000L
+        // How long the downlink can be idle (while uplink is active) before we
+        // flag a probable video-hang / MTU blackhole in the logs.
+        private const val RX_STALL_MS = 8000L
     }
 }

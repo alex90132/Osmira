@@ -19,6 +19,11 @@ class AppSettings {
   /// Force the TUN MTU to 1500 instead of the config value. Masks the
   /// WireGuard MTU/MSS-reduction fingerprint that on-device detectors look for
   /// (at a small cost to large-packet reliability on some paths).
+  ///
+  /// Shelved for now: the toggle is hidden from Settings and [mtuOverride]
+  /// ignores it, so a previously-enabled flag can't silently force MTU 1500
+  /// (a prime suspect for large-packet stalls). The field stays persisted so
+  /// re-enabling the feature later is trivial.
   final bool normalizeMtu;
 
   /// Include pre-installed system apps in the split-tunnel picker.
@@ -30,7 +35,8 @@ class AppSettings {
   /// Global per-app routing (split tunnel), applied to whichever profile is up.
   final AppRouting routing;
 
-  int? get mtuOverride => normalizeMtu ? 1500 : null;
+  // MTU normalization is shelved (see [normalizeMtu]) — never override.
+  int? get mtuOverride => null;
 
   AppSettings copyWith({
     bool? normalizeMtu,

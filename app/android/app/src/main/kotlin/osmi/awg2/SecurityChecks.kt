@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import android.util.Log
 import java.io.File
 import java.security.MessageDigest
 
@@ -28,7 +27,6 @@ import java.security.MessageDigest
  * so R8 can't fold it and a SMALI decompile shows only opaque bytes.
  */
 internal object SecurityChecks {
-    private const val TAG = "OsmiraSec"
 
     /**
      * SHA-256 of the release signing certificate (osmira-release.jks, alias
@@ -56,13 +54,13 @@ internal object SecurityChecks {
     fun runStartupChecks(context: Context, isDebugBuild: Boolean): Boolean {
         if (isDebugBuild) return true
 
+        // No logging on trip: the attacker must get zero hint about which check
+        // fired (see class doc) — just kill the process silently.
         if (!verifySignature(context)) {
-            Log.w(TAG, "signature mismatch")
             killSelf()
             return false
         }
         if (detectFrida()) {
-            Log.w(TAG, "tooling detected")
             killSelf()
             return false
         }

@@ -1,3 +1,4 @@
+import '../../../../core/log.dart';
 import '../../domain/entities/app_routing.dart';
 import '../../domain/entities/vpn_status.dart';
 import '../../domain/entities/vpn_tunnel.dart';
@@ -50,12 +51,22 @@ class VpnConnectionRepositoryImpl implements VpnConnectionRepository {
     final routes = <String>{
       for (final p in cfg.peers) ...p.allowedIps,
     }.toList(growable: false);
+    final mtu = mtuOverride ?? cfg.interface.mtu ?? 1280;
+
+    // Never log the uapi string — it contains the WireGuard private key.
+    AppLog.lazy(
+      'Payload',
+      () => 'mtu=$mtu dns=${cfg.interface.dnsServers} '
+          'routes=${routes.length} peers=${cfg.peers.length} '
+          'endpoint=${peer?.endpoint?.host}:${peer?.endpoint?.port} '
+          'awg2=${cfg.interface.parameters.isV2}',
+    );
 
     return {
       'id': tunnel.id,
       'name': tunnel.name,
       'uapi': _serializer.serialize(cfg),
-      'mtu': mtuOverride ?? cfg.interface.mtu ?? 1280,
+      'mtu': mtu,
       'addresses': cfg.interface.addresses,
       'dns': cfg.interface.dnsServers,
       'searchDomains': cfg.interface.dnsSearchDomains,

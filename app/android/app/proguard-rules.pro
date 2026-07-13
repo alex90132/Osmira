@@ -13,3 +13,16 @@
 # Flutter engine (kept by the tool's bundled rules too, but be explicit).
 -keep class io.flutter.** { *; }
 -dontwarn io.flutter.**
+
+# Belt-and-suspenders: strip every android.util.Log call from release. Our
+# Kotlin logging is already guarded by BuildConfig.DEBUG, but this guarantees
+# that even a stray or dependency Log.* emits nothing in release — R8 drops the
+# call and the dead argument/string-building along with it.
+-assumenosideeffects class android.util.Log {
+    public static *** v(...);
+    public static *** d(...);
+    public static *** i(...);
+    public static *** w(...);
+    public static *** e(...);
+    public static *** wtf(...);
+}
