@@ -94,20 +94,31 @@ jobs:
       - name: Analyze
         run: flutter analyze
 
-      - name: Build release APK (obfuscated)
+      - name: Build per-ABI release APKs (obfuscated)
+        # One APK per ABI instead of a fat universal build — each is ~1/2 the size
+        # and ships only the code its device runs. We only support the ABIs that
+        # have a native libwg-go.so (arm64-v8a for phones, x86_64 for emulators).
         run: |
           flutter build apk --release \
+            --split-per-abi \
+            --target-platform android-arm64,android-x64 \
             --obfuscate --split-debug-info=build/symbols \
             --build-name="${{ steps.ver.outputs.version }}" \
             --build-number="${{ github.run_number }}"
 
-      - name: Rename artifact
-        id: apk
+      - name: Rename artifacts
+        # osmira-<version>-<abi>.apk, e.g. osmira-0.1.0-arm64.apk / -x86_64.apk.
         run: |
-          SRC=build/app/outputs/flutter-apk/app-release.apk
-          OUT="osmira-${{ steps.ver.outputs.version }}.apk"
-          cp "$SRC" "$OUT"
-          echo "path=app/$OUT" >> "$GITHUB_OUTPUT"
+          cd build/app/outputs/flutter-apk
+          V="${{ steps.ver.outputs.version }}"
+          declare -A MAP=( [arm64-v8a]=arm64 [x86_64]=x86_64 [armeabi-v7a]=arm )
+          for f in app-*-release.apk; do
+            abi="${f#app-}"; abi="${abi%-release.apk}"
+            out="osmira-${V}-${MAP[$abi]:-$abi}.apk"
+            cp "$f" "$out"
+            echo "  $f -> $out"
+          done
+          ls -1 osmira-*.apk
 
       - name: Clean up signing material
         if: always()
@@ -121,11 +132,11 @@ jobs:
           tag_name: ${{ github.ref_name }}
           generate_release_notes: true
           fail_on_unmatched_files: true
-          files: ${{ steps.apk.outputs.path }}
+          files: app/build/app/outputs/flutter-apk/osmira-*.apk
 
       - name: Upload workflow artifact (manual runs)
         if: github.ref_type != 'tag'
         uses: actions/upload-artifact@v4
         with:
           name: osmira-apk
-          path: ${{ steps.apk.outputs.path }}
+          path: app/build/app/outputs/flutter-apk/osmira-*.apk

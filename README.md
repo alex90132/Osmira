@@ -47,8 +47,9 @@ it up automatically:
   this repo's URL. You'll get every future release as an update.
 - **[Komi Store](https://www.komistore.app) / RepoStore** — search for
   *Osmira*; they list repos that publish an APK.
-- **Manually** — download `osmira-<version>.apk` from the
-  [latest release](../../releases/latest) and open it.
+- **Manually** — from the [latest release](../../releases/latest) grab
+  `osmira-<version>-arm64.apk` (virtually every phone) or the `-x86_64.apk`
+  (emulators) and open it.
 
 > On Android 13+ the app asks for notification permission the first time — it's
 > only used for the connection status notification.
