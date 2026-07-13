@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="README.md">English</a> ·
-  <a href="README.ru.md"><b>Русский</b></a>
+  <b>Русский</b>
 </p>
 
 <p align="center">
