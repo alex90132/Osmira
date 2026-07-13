@@ -1,0 +1,114 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Minimal permission set. The system VpnService implies BIND_VPN_SERVICE;
+         we deliberately avoid QUERY_ALL_PACKAGES, storage and location perms so
+         the app looks like the plain network utility it is. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <application
+        android:label="Osmira"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:networkSecurityConfig="@xml/network_security_config">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+
+            <!-- Deep link: vpn://... links open Osmira directly. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="vpn"/>
+            </intent-filter>
+
+            <!-- File association for .vpn / .conf configs. Mirrors the official
+                 AmneziaVPN filter so Osmira reliably appears in "Open with" for
+                 files shared from Telegram, file managers, etc. The pathPattern
+                 (with mimeType="*/*" + host="*") matches by extension across
+                 both file:// and content:// URIs — the MIME alone is unreliable
+                 because senders label .vpn inconsistently. -->
+            <intent-filter android:label="Osmira">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="file"/>
+                <data android:scheme="content"/>
+                <data android:mimeType="*/*"/>
+                <data android:host="*"/>
+                <data android:pathPattern=".*\\.vpn"/>
+                <data android:pathPattern=".*\\..*\\.vpn"/>
+                <data android:pathPattern=".*\\..*\\..*\\.vpn"/>
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.vpn"/>
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.vpn"/>
+                <data android:pathPattern=".*\\.conf"/>
+                <data android:pathPattern=".*\\..*\\.conf"/>
+                <data android:pathPattern=".*\\..*\\..*\\.conf"/>
+                <data android:pathPattern=".*\\..*\\..*\\..*\\.conf"/>
+                <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.conf"/>
+            </intent-filter>
+            <!-- Files shared via ACTION_SEND (e.g. Telegram "Share") — matched
+                 by MIME since a shared stream often has no path/extension. -->
+            <intent-filter android:label="Osmira">
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/octet-stream"/>
+                <data android:mimeType="application/x-amnezia-vpn"/>
+                <data android:mimeType="application/vpn"/>
+            </intent-filter>
+        </activity>
+
+        <!-- AmneziaWG userspace VPN service (Go backend loaded via JNI). -->
+        <service
+            android:name=".AwgVpnService"
+            android:exported="false"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="AmneziaWG VPN tunnel controlled by the user"/>
+            <intent-filter>
+                <action android:name="android.net.VpnService"/>
+            </intent-filter>
+        </service>
+
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+    </application>
+
+    <!-- Enumerate only *launchable* apps for the split-tunnel picker, WITHOUT
+         the high-risk QUERY_ALL_PACKAGES permission (which Play Protect flags).
+         PROCESS_TEXT is required by the Flutter engine's text toolbar. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LAUNCHER"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+</manifest>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app itself never talks plaintext HTTP; only loopback is allowed
+     (harmless, and avoids breaking any local debugging tooling). Tunnel
+     traffic is handled by the VPN layer, not by app HTTP clients. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">localhost</domain>
+    </domain-config>
+</network-security-config>

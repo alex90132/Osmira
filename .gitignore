@@ -1,0 +1,55 @@
+# ─────────────────────────────────────────────────────────────────────────
+# Osmira (awg2-client) — repository ignore rules.
+# Everything that is a SECRET, a large local toolchain, or a build artifact
+# stays OUT of version control. Only the app source + build scripts ship.
+# ─────────────────────────────────────────────────────────────────────────
+
+# ── SECRETS — never publish (leaking these lets anyone sign fake updates) ──
+# Release signing keystore and its passwords:
+**/key.properties
+*.jks
+*.keystore
+*.p12
+*.pepk
+# Google/Firebase service files, if ever added:
+**/google-services.json
+**/GoogleService-Info.plist
+*.serviceaccount.json
+
+# ── Example / user VPN configs (embed WireGuard PRIVATE KEYS) ──
+*.vpn
+*.conf
+
+# ── Local Go toolchain, module cache and patched GOROOT (hundreds of MB) ──
+.gohome/
+.gomodcache/
+.goroot-patched/
+
+# ── Native build staging + third-party sources fetched for building .so ──
+# (amneziawg-go / amneziawg-android are cloned here on demand — see README)
+/staging/
+/refs/
+
+# ── Build logs ──
+*.log
+
+# ── Flutter / Dart / Gradle build output & caches ──
+app/build/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.pub-cache/
+app/.pub/
+app/**/generated_plugin_registrant.*
+app/android/.gradle/
+app/android/local.properties
+app/android/app/debug/
+app/android/app/profile/
+app/android/app/release/
+app/**/*.iml
+app/.idea/
+
+# ── OS / editor cruft ──
+.DS_Store
+*.swp
+.vscode/

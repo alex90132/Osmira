@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches AppColors.bg on the Flutter side (pure black) so the window,
+         splash and system bars share one seamless surface. -->
+    <color name="launch_bg">#FF000000</color>
+    <!-- Adaptive-icon background (same black as the app canvas). -->
+    <color name="ic_launcher_background">#FF000000</color>
+</resources>
