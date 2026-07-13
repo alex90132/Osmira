@@ -40,10 +40,10 @@ class ConnectionPanel extends StatelessWidget {
     return Column(
       children: [
         _PowerButton(ring: _ring, busy: _busy, onTap: onToggle),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
         _StatusText(status: status, selected: selected),
         if (status.state == VpnConnectionState.connected) ...[
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
           _StatsStrip(status: status),
         ],
       ],
@@ -72,8 +72,8 @@ class _PowerButton extends StatelessWidget {
         onTap: busy ? null : onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          width: 196,
-          height: 196,
+          width: 148,
+          height: 148,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: RadialGradient(
@@ -85,22 +85,22 @@ class _PowerButton extends StatelessWidget {
               if (on)
                 BoxShadow(
                   color: ring.withValues(alpha: 0.35),
-                  blurRadius: 40,
-                  spreadRadius: 4,
+                  blurRadius: 32,
+                  spreadRadius: 2,
                 ),
             ],
           ),
           child: Center(
             child: busy
                 ? SizedBox(
-                    width: 64,
-                    height: 64,
+                    width: 48,
+                    height: 48,
                     child: CircularProgressIndicator(
                       strokeWidth: 3,
                       color: ring,
                     ),
                   )
-                : Icon(Icons.power_settings_new_rounded, size: 84, color: ring),
+                : Icon(Icons.power_settings_new_rounded, size: 60, color: ring),
           ),
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/widgets/edge_fade.dart';
 import '../../../settings/presentation/settings_controller.dart';
 import '../../domain/entities/app_routing.dart';
 import '../../domain/entities/installed_app.dart';
@@ -98,7 +99,9 @@ class _AppRoutingScreenState extends ConsumerState<AppRoutingScreen> {
               ),
             ),
             Expanded(
-              child: _TopFade(
+              child: EdgeFade(
+                top: 32,
+                bottom: 24,
                 child: appsAsync.when(
                   loading: () =>
                       const Center(child: CircularProgressIndicator()),
@@ -133,39 +136,6 @@ class _AppRoutingScreenState extends ConsumerState<AppRoutingScreen> {
         AppRoutingMode.include =>
           'Только выбранные приложения пойдут через VPN.',
       };
-}
-
-/// Fades the top edge of its child to transparent over a fixed band, so the
-/// scrolling app list dissolves into the black background under the search
-/// field instead of being hard-clipped. Uses [BlendMode.dstIn] so only alpha
-/// is affected (the gradient's colour is irrelevant, just its opacity).
-class _TopFade extends StatelessWidget {
-  const _TopFade({required this.child});
-
-  static const _fadeHeight = 32.0;
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final frac = constraints.maxHeight.isFinite && constraints.maxHeight > 0
-            ? (_fadeHeight / constraints.maxHeight).clamp(0.0, 0.5)
-            : 0.0;
-        return ShaderMask(
-          blendMode: BlendMode.dstIn,
-          shaderCallback: (rect) => LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: const [Colors.transparent, Colors.black],
-            stops: [0.0, frac],
-          ).createShader(rect),
-          child: child,
-        );
-      },
-    );
-  }
 }
 
 class _AppList extends StatelessWidget {

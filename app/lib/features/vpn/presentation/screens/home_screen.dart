@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/di.dart';
 import '../../../../app/theme.dart';
+import '../../../../core/widgets/edge_fade.dart';
 import '../../../settings/presentation/settings_controller.dart';
 import '../../../settings/presentation/settings_screen.dart';
 import '../../domain/entities/app_routing.dart';
@@ -57,6 +58,9 @@ class HomeScreen extends ConsumerWidget {
     });
 
     return Scaffold(
+      // Transparent header that the profile list scrolls *behind*, so rows melt
+      // away under the title instead of stopping at a hard edge.
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('Osmira'),
         actions: [
@@ -79,34 +83,40 @@ class HomeScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         bottom: false,
-        child: RefreshIndicator(
-          onRefresh: () async => ref.invalidate(tunnelsProvider),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            children: [
-              const SizedBox(height: 16),
-              _StatusPanel(
+        child: Column(
+          children: [
+            // Leaves room for the transparent AppBar we extend behind.
+            const SizedBox(height: kToolbarHeight + 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: _StatusPanel(
                 selected: selected,
-                onToggle: () => _toggle(context, ref, activeId != null, selected),
+                onToggle: () =>
+                    _toggle(context, ref, activeId != null, selected),
               ),
-              const SizedBox(height: 36),
-              if (tunnels case AsyncError(:final error) when list.isEmpty)
-                _ErrorState(message: '$error')
-              else if (list.isEmpty)
-                const _EmptyState()
-              else
-                _ProfilesSection(
-                  tunnels: list,
-                  selectedId: effectiveId,
-                  activeId: activeId,
-                  routing: routing,
-                  onSelect: (t) =>
-                      ref.read(selectedTunnelIdProvider.notifier).select(t.id),
-                  onRename: (t) => _rename(context, ref, t),
-                  onDelete: (t) => _delete(ref, t),
-                ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 24),
+            // The profiles block owns the only scroll region on the screen.
+            Expanded(
+              child: switch (tunnels) {
+                AsyncError(:final error) when list.isEmpty =>
+                  _CenteredCard(child: _ErrorState(message: '$error')),
+                _ when list.isEmpty => const _CenteredCard(child: _EmptyState()),
+                _ => _ProfilesSection(
+                    tunnels: list,
+                    selectedId: effectiveId,
+                    activeId: activeId,
+                    routing: routing,
+                    onRefresh: () async => ref.invalidate(tunnelsProvider),
+                    onSelect: (t) => ref
+                        .read(selectedTunnelIdProvider.notifier)
+                        .select(t.id),
+                    onRename: (t) => _rename(context, ref, t),
+                    onDelete: (t) => _delete(ref, t),
+                  ),
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -195,12 +205,17 @@ class _StatusPanel extends ConsumerWidget {
   }
 }
 
+/// The profiles block: a fixed "ПРОФИЛИ" header over its own scrolling list.
+/// The list — and only the list — scrolls, with both edges dissolving into the
+/// background (top under the header, bottom over the action bar), mirroring the
+/// app-routing screen. Nothing else on the home screen moves.
 class _ProfilesSection extends StatelessWidget {
   const _ProfilesSection({
     required this.tunnels,
     required this.selectedId,
     required this.activeId,
     required this.routing,
+    required this.onRefresh,
     required this.onSelect,
     required this.onRename,
     required this.onDelete,
@@ -210,17 +225,19 @@ class _ProfilesSection extends StatelessWidget {
   final String? selectedId;
   final String? activeId;
   final AppRouting routing;
+  final Future<void> Function() onRefresh;
   final ValueChanged<VpnTunnel> onSelect;
   final ValueChanged<VpnTunnel> onRename;
   final ValueChanged<VpnTunnel> onDelete;
 
   @override
   Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
           child: Text(
             'ПРОФИЛИ',
             style: TextStyle(
@@ -231,21 +248,57 @@ class _ProfilesSection extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 12),
-        for (final t in tunnels)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: TunnelCard(
-              tunnel: t,
-              selected: t.id == selectedId,
-              active: t.id == activeId,
-              routing: routing,
-              onTap: () => onSelect(t),
-              onRename: () => onRename(t),
-              onDelete: () => onDelete(t),
+        Expanded(
+          child: EdgeFade(
+            top: 14,
+            bottom: 24,
+            child: RefreshIndicator(
+              onRefresh: onRefresh,
+              child: ListView.builder(
+                // Top padding ≥ the fade band, so the first card sits fully
+                // below it at rest and only dissolves once scrolled up under.
+                padding: EdgeInsets.fromLTRB(20, 18, 20, bottomInset + 16),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
+                itemCount: tunnels.length,
+                itemBuilder: (_, i) {
+                  final t = tunnels[i];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: TunnelCard(
+                      tunnel: t,
+                      selected: t.id == selectedId,
+                      active: t.id == activeId,
+                      routing: routing,
+                      onTap: () => onSelect(t),
+                      onRename: () => onRename(t),
+                      onDelete: () => onDelete(t),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
+        ),
       ],
+    );
+  }
+}
+
+/// Centers an empty/error card in the profiles area (the list would otherwise
+/// have nothing to scroll).
+class _CenteredCard extends StatelessWidget {
+  const _CenteredCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+      child: child,
     );
   }
 }
