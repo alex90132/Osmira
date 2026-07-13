@@ -130,18 +130,22 @@ jobs:
         run: rm -f android/app/osmira-release.jks android/key.properties
 
       - name: Publish GitHub Release
+        # Published with the built-in gh CLI (no third-party action, no Node
+        # runtime pinning to worry about). The tag is already pushed, so this
+        # just attaches notes + the per-ABI APKs to it.
         if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Osmira ${{ steps.ver.outputs.version }}
-          tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          files: app/build/app/outputs/flutter-apk/osmira-*.apk
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s failglob  # fail loudly if no APK matched the glob
+          gh release create "$GITHUB_REF_NAME" \
+            build/app/outputs/flutter-apk/osmira-*.apk \
+            --title "Osmira ${{ steps.ver.outputs.version }}" \
+            --generate-notes
 
       - name: Upload workflow artifact (manual runs)
         if: github.ref_type != 'tag'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: osmira-apk
           path: app/build/app/outputs/flutter-apk/osmira-*.apk
