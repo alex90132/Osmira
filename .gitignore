@@ -49,6 +49,13 @@ app/android/app/release/
 app/**/*.iml
 app/.idea/
 
+# ── Local-only dev helpers (NOT needed to build — the APK builds from the
+#    committed jniLibs/*.so and icon assets). Kept on disk, out of the repo.
+#    NB: build-libwg-go.sh IS shipped — it documents how the .so was produced. ──
+/gen_icons.py
+/build-libwg-go-sysgo.sh
+/scripts/
+
 # ── OS / editor cruft ──
 .DS_Store
 *.swp
