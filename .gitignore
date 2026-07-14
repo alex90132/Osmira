@@ -56,6 +56,25 @@ app/.idea/
 /build-libwg-go-sysgo.sh
 /scripts/
 
+# ── iOS / Xcode (generated or machine-specific; regenerated on the Mac) ──
+app/ios/Pods/
+app/ios/.symlinks/
+app/ios/Flutter/ephemeral/
+app/ios/Flutter/Generated.xcconfig
+app/ios/Flutter/flutter_export_environment.sh
+app/ios/Flutter/App.framework
+app/ios/Flutter/Flutter.framework
+app/ios/Flutter/Flutter.podspec
+app/ios/Flutter/flutter_assets/
+app/ios/Flutter/.last_build_id
+app/ios/ServiceDefinitions.json
+app/ios/Runner/GeneratedPluginRegistrant.*
+app/ios/**/xcuserdata/
+app/ios/**/*.pbxuser
+app/ios/**/*.mode1v3
+app/ios/**/*.mode2v3
+app/ios/Podfile.lock
+
 # ── OS / editor cruft ──
 .DS_Store
 *.swp
