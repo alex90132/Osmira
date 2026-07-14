@@ -17,9 +17,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/home.webp" width="260" alt="Home screen">
-  &nbsp;&nbsp;
-  <img src="docs/screenshots/connected.webp" width="260" alt="Connected">
+  <img src="docs/screenshots/home.webp" width="45%" alt="Home screen">
+  <img src="docs/screenshots/connected.webp" width="45%" alt="Connected">
 </p>
 
 ## What it does

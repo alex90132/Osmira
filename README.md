@@ -17,9 +17,8 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/home.webp" width="260" alt="Главный экран">
-  &nbsp;&nbsp;
-  <img src="docs/screenshots/connected.webp" width="260" alt="Подключено">
+  <img src="docs/screenshots/home.webp" width="45%" alt="Главный экран">
+  <img src="docs/screenshots/connected.webp" width="45%" alt="Подключено">
 </p>
 
 ## Что умеет
