@@ -68,8 +68,10 @@ class _PowerButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'Переключить подключение',
+      // Stays tappable while busy so the user can always cancel a connect /
+      // reconnect that's spinning (e.g. an unreachable server).
       child: GestureDetector(
-        onTap: busy ? null : onTap,
+        onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           width: 148,

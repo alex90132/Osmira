@@ -62,7 +62,8 @@ class AwgVpnService : VpnService() {
                 // Always-on VPN. Try to bring the last tunnel back up.
                 if (payload != null) {
                     startForegroundNotification()
-                    Thread({ connect(payload!!) }, "AwgReconnect").start()
+                    // System/always-on restart: keep retrying rather than erroring.
+                    Thread({ connect(payload!!, initial = false) }, "AwgReconnect").start()
                     return START_STICKY
                 }
                 stopSelf()
@@ -71,7 +72,7 @@ class AwgVpnService : VpnService() {
         }
     }
 
-    private fun connect(cfg: JSONObject) {
+    private fun connect(cfg: JSONObject, initial: Boolean = true) {
         synchronized(lock) {
             try {
                 if (handle != -1) return
@@ -107,7 +108,7 @@ class AwgVpnService : VpnService() {
                 protect(GoBackend.awgGetSocketV6(handle))
                 running = true
                 registerNetworkCallback()
-                startPoller(cfg.optString("id"))
+                startPoller(cfg.optString("id"), initial)
                 logd("tunnel up: ${GoBackend.awgVersion()}")
             } catch (e: Throwable) {
                 loge("connect failed", e)
@@ -174,9 +175,10 @@ class AwgVpnService : VpnService() {
         return pfd.detachFd()
     }
 
-    private fun startPoller(id: String?) {
+    private fun startPoller(id: String?, initial: Boolean) {
         val gen = ++generation
         poller = Thread({
+            val connectStartMs = System.currentTimeMillis()
             var connectedReported = false
             var prevRx = 0L
             var prevTx = 0L
@@ -210,6 +212,25 @@ class AwgVpnService : VpnService() {
                     AwgVpnState.update("connected", id, rx, tx, hs)
                 } else {
                     AwgVpnState.update("connecting", id, rx, tx, 0)
+                }
+
+                // Give up on an initial (user-initiated) connect that never gets
+                // a handshake — server down / wrong endpoint / blocked port. This
+                // is what otherwise spins "Подключение…" forever. Auto-reconnects
+                // (initial=false) keep retrying so a brief outage doesn't kill an
+                // always-on tunnel; either way the user can cancel from the UI.
+                if (initial && !connectedReported &&
+                    nowMs - connectStartMs > CONNECT_TIMEOUT_MS
+                ) {
+                    logw("connect timeout: no handshake in ${CONNECT_TIMEOUT_MS / 1000}s")
+                    AwgVpnState.update(
+                        "error",
+                        id = id,
+                        error = "Не удалось подключиться — сервер недоступен",
+                    )
+                    updateNotification("Не удалось подключиться")
+                    teardown(stopService = true, announce = false)
+                    return@Thread
                 }
 
                 if (BuildConfig.DEBUG) {
@@ -283,7 +304,7 @@ class AwgVpnService : VpnService() {
                     tun?.close(); tun = null
                 }
                 sleep(600)
-                connect(cfg)
+                connect(cfg, initial = false)
             } finally {
                 restarting.set(false)
             }
@@ -316,7 +337,7 @@ class AwgVpnService : VpnService() {
         }
     }
 
-    private fun teardown(stopService: Boolean) {
+    private fun teardown(stopService: Boolean, announce: Boolean = true) {
         synchronized(lock) {
             running = false
             generation++
@@ -333,7 +354,7 @@ class AwgVpnService : VpnService() {
             tun = null
             payload = null
         }
-        AwgVpnState.update("disconnected")
+        if (announce) AwgVpnState.update("disconnected")
         if (stopService) {
             stopForegroundCompat()
             stopSelf()
@@ -454,6 +475,9 @@ class AwgVpnService : VpnService() {
         private const val NOTIF_ID = 1001
         private const val STALL_SECONDS = 180L
         private const val POLL_MS = 2000L
+        // Max time an initial connect may sit without a handshake before we give
+        // up and report an error (instead of spinning "Подключение…" forever).
+        private const val CONNECT_TIMEOUT_MS = 20000L
         // How long the downlink can be idle (while uplink is active) before we
         // flag a probable video-hang / MTU blackhole in the logs.
         private const val RX_STALL_MS = 8000L
