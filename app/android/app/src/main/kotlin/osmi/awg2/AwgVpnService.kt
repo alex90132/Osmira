@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.drawable.Icon
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -405,6 +406,9 @@ class AwgVpnService : VpnService() {
             .setContentTitle("Osmira")
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_stat_vpn)
+            // Full-colour brand mark shown inside the push (large icons aren't
+            // tinted, unlike the monochrome status-bar small icon).
+            .setLargeIcon(Icon.createWithResource(this, R.drawable.ic_notification_large))
             .setColor(0xFF3B82F6.toInt())
             .setOngoing(true)
             .setOnlyAlertOnce(true)
