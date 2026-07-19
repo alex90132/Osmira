@@ -36,6 +36,14 @@ class DeleteTunnel {
   Future<void> call(String id) => _repo.delete(id);
 }
 
+/// Bumps a tunnel to the top of the list when it's (re)connected.
+class MarkTunnelConnected {
+  const MarkTunnelConnected(this._repo);
+  final TunnelRepository _repo;
+
+  Future<void> call(String id) => _repo.markConnected(id);
+}
+
 /// Update a tunnel's display name.
 class UpdateTunnel {
   const UpdateTunnel(this._repo);

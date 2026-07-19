@@ -43,6 +43,8 @@ class ConnectionController extends Notifier<AsyncValue<void>> {
             routing: settings.routing,
           );
       state = const AsyncData(null);
+      // Float the just-used profile to the top of the list.
+      await ref.read(markTunnelConnectedProvider).call(tunnel.id);
       _armWatchdog();
     } catch (e, st) {
       AppLog.d('Conn', 'connect FAILED: $e');

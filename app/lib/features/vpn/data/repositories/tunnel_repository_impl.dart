@@ -78,6 +78,16 @@ class TunnelRepositoryImpl implements TunnelRepository {
     _controller.add(await getTunnels());
   }
 
+  @override
+  Future<void> markConnected(String id) async {
+    final records = await _store.read();
+    final idx = records.indexWhere((r) => r.id == id);
+    if (idx <= 0) return; // missing, or already at the top
+    records.insert(0, records.removeAt(idx));
+    await _store.write(records);
+    _controller.add(await getTunnels());
+  }
+
   void dispose() => _controller.close();
 
   VpnTunnel _fromRecord(TunnelRecord r) {

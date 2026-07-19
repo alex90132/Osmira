@@ -55,6 +55,7 @@ app/.idea/
 /gen_icons.py
 /build-libwg-go-sysgo.sh
 /scripts/
+__pycache__/
 
 # ── iOS / Xcode (generated or machine-specific; regenerated on the Mac) ──
 app/ios/Pods/

@@ -16,4 +16,8 @@ abstract interface class TunnelRepository {
   Future<void> save(VpnTunnel tunnel);
 
   Future<void> delete(String id);
+
+  /// Moves the tunnel with [id] to the top of the list so the most recently
+  /// connected profile is always first. No-op if it's missing or already first.
+  Future<void> markConnected(String id);
 }

@@ -70,6 +70,9 @@ final watchTunnelsProvider = Provider(
 final deleteTunnelProvider = Provider(
   (ref) => DeleteTunnel(ref.watch(tunnelRepositoryProvider)),
 );
+final markTunnelConnectedProvider = Provider(
+  (ref) => MarkTunnelConnected(ref.watch(tunnelRepositoryProvider)),
+);
 final updateTunnelProvider = Provider(
   (ref) => UpdateTunnel(ref.watch(tunnelRepositoryProvider)),
 );
