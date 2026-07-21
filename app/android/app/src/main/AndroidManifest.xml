@@ -93,6 +93,33 @@
             </intent-filter>
         </service>
 
+        <!-- Invisible bridge for the tile: starts the FGS (and shows the VPN
+             consent dialog if needed) from a visible context, then finishes. -->
+        <activity
+            android:name=".TileActionActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"/>
+
+        <!-- Quick-settings tile: toggle the last-used tunnel straight from the
+             notification shade (like the AmneziaVPN tile). -->
+        <service
+            android:name=".AwgTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_vpn"
+            android:label="Osmira"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="false"/>
+        </service>
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

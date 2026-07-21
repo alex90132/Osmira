@@ -78,6 +78,9 @@ class AwgVpnService : VpnService() {
             try {
                 if (handle != -1) return
                 payload = cfg
+                // Remember the last user-initiated tunnel so the quick-settings
+                // tile can bring it back up from cold (stored encrypted).
+                if (initial) TileConfigStore.save(applicationContext, cfg.toString())
                 // Config summary — deliberately excludes "uapi" (private key).
                 logd(
                     "connect id=${cfg.optString("id")} name=${cfg.optString("name")} " +
