@@ -1,7 +1,7 @@
 <h1 align="center">Osmira</h1>
 
 <p align="center">
-  Простой VPN-клиент <b>AmneziaWG (AWG 2.0)</b> для Android.<br/>
+  Простой VPN-клиент <b>AmneziaWG (AWG 3.0)</b> для Android.<br/>
   Закинул <code>.vpn</code>-конфиг, выбрал, какие приложения пускать в туннель, и забыл.
 </p>
 
@@ -13,7 +13,7 @@
 <p align="center">
   <img alt="Лицензия: MIT" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="Платформа: Android" src="https://img.shields.io/badge/platform-Android%209%2B-3ddc84">
-  <img alt="Протокол: AmneziaWG" src="https://img.shields.io/badge/protocol-AmneziaWG%202.0-3b82f6">
+  <img alt="Протокол: AmneziaWG" src="https://img.shields.io/badge/protocol-AmneziaWG%203.0-3b82f6">
 </p>
 
 <p align="center">
@@ -24,9 +24,12 @@
 ## Что умеет
 
 Osmira работает по AmneziaWG. Это WireGuard с обфускацией, из-за которой
-рукопожатие не выделяется в трафике. Поддержаны все параметры AWG2:
-`Jc/Jmin/Jmax`, `S1-S4`, `H1-H4`, `I1-I5`. Ничего лишнего: импортировал конфиг,
-нажал «подключить», и он держит соединение.
+рукопожатие не выделяется в трафике. Поддержаны все параметры AWG2
+(`Jc/Jmin/Jmax`, `S1-S4`, `H1-H4`, `I1-I5`) и AWG3: шифрование заголовков
+(`HeaderProtectionKey`), добивка данных (`ContentPaddingAddition`) и настраиваемые
+тайминги рукопожатия (`RekeyAfterTime`, `RekeyTimeout`, `RejectAfterTime`,
+`KeepaliveTimeout`, `MaxHandshakeAttempts`), включая диапазоны вида `20-30`.
+Ничего лишнего: импортировал конфиг, нажал «подключить», и он держит соединение.
 
 - **Импорт чего угодно из AmneziaWG.** Открой `.vpn`-файл, вставь `vpn://`-ссылку
   или скорми обычный `.conf`.

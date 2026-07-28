@@ -36,7 +36,16 @@ class AwgVpnService : VpnService() {
     @Volatile private var running = false
     private var poller: Thread? = null
     private val restarting = AtomicBoolean(false)
-    private var generation = 0
+    @Volatile private var generation = 0
+
+    /**
+     * Set once the system takes our VPN slot away — the user started another VPN
+     * app or cleared our consent. Android allows exactly one active VPN, so any
+     * attempt to re-establish here would kick the other client out, which then
+     * re-establishes and kicks us out in turn: both apps ping-pong forever. So a
+     * revoke is final, and only a fresh user-initiated connect clears it.
+     */
+    @Volatile private var revoked = false
 
     private var connectivity: ConnectivityManager? = null
     private var netCallback: ConnectivityManager.NetworkCallback? = null
@@ -53,6 +62,9 @@ class AwgVpnService : VpnService() {
                     stopSelf()
                     return START_NOT_STICKY
                 }
+                // A user-initiated connect comes with fresh consent, so this is
+                // the one place a previous revoke is forgiven.
+                revoked = false
                 startForegroundNotification()
                 Thread({ connect(JSONObject(raw)) }, "AwgConnect").start()
                 // STICKY so the OS restarts us after being killed in background.
@@ -60,11 +72,13 @@ class AwgVpnService : VpnService() {
             }
             else -> {
                 // Restarted by the system (START_STICKY with null intent) or
-                // Always-on VPN. Try to bring the last tunnel back up.
-                if (payload != null) {
+                // Always-on VPN. Try to bring the last tunnel back up, but only
+                // while the VPN slot is still ours.
+                val cfg = payload
+                if (cfg != null && !revoked && hasVpnConsent()) {
                     startForegroundNotification()
                     // System/always-on restart: keep retrying rather than erroring.
-                    Thread({ connect(payload!!, initial = false) }, "AwgReconnect").start()
+                    Thread({ connect(cfg, initial = false) }, "AwgReconnect").start()
                     return START_STICKY
                 }
                 stopSelf()
@@ -77,6 +91,12 @@ class AwgVpnService : VpnService() {
         synchronized(lock) {
             try {
                 if (handle != -1) return
+                // A revoke may have landed while this thread was queued on the
+                // lock; taking the tunnel back now would restart the ping-pong.
+                if (revoked) {
+                    logw("connect aborted: VPN slot was revoked")
+                    return
+                }
                 payload = cfg
                 // Remember the last user-initiated tunnel so the quick-settings
                 // tile can bring it back up from cold (stored encrypted).
@@ -93,7 +113,15 @@ class AwgVpnService : VpnService() {
                 AwgVpnState.update("connecting", id = cfg.optString("id"))
 
                 val tunFd = establishTun(cfg) ?: run {
-                    AwgVpnState.update("error", error = "Не удалось создать TUN")
+                    // `establish()` returns null once the slot belongs to someone
+                    // else, so name the real cause instead of blaming the TUN.
+                    val busy = !hasVpnConsent()
+                    if (busy) revoked = true
+                    AwgVpnState.update(
+                        "error",
+                        error = if (busy) "Слот VPN занят другим приложением"
+                        else "Не удалось создать TUN",
+                    )
                     stopSelf()
                     return
                 }
@@ -208,6 +236,11 @@ class AwgVpnService : VpnService() {
                 }
                 val rxIdleMs = nowMs - lastRxProgressMs
 
+                // A revoke or teardown can land mid-iteration. Publishing after
+                // that would overwrite the final "disconnected" with a stale
+                // "connecting" and leave the UI spinning on a dead tunnel.
+                if (!running || gen != generation) return@Thread
+
                 if (hs > 0) {
                     if (!connectedReported) {
                         connectedReported = true
@@ -292,8 +325,9 @@ class AwgVpnService : VpnService() {
     }
 
     private fun scheduleRestart(reason: String) {
-        if (!running) return
+        if (!running || revoked) return
         if (!restarting.compareAndSet(false, true)) return
+        val gen = generation
         logw("scheduleRestart reason=$reason")
         AwgVpnState.update("reconnecting", id = payload?.optString("id"))
         updateNotification("Переподключение…")
@@ -307,12 +341,50 @@ class AwgVpnService : VpnService() {
                     }
                     tun?.close(); tun = null
                 }
-                sleep(600)
+                sleep(RESTART_DELAY_MS)
+                // The tunnel may have been revoked or torn down while we slept;
+                // `generation` moves on both a teardown and a newer poller.
+                if (revoked || !running || generation != gen) {
+                    logw("restart dropped (revoked=$revoked running=$running)")
+                    return@Thread
+                }
+                // A stalled tunnel and a hijacked tunnel look identical from the
+                // handshake counter, so confirm the VPN slot is still ours before
+                // reconnecting. Without this the stall detector keeps re-arming
+                // against a slot another client now owns.
+                if (!hasVpnConsent()) {
+                    yieldToOtherVpn()
+                    return@Thread
+                }
                 connect(cfg, initial = false)
             } finally {
                 restarting.set(false)
             }
         }, "AwgRestart").start()
+    }
+
+    /**
+     * True while we still hold the system's single VPN slot. `prepare` returns a
+     * consent intent once another app has taken it over. Failures are treated as
+     * "still ours" so a quirky ROM can't block legitimate reconnects.
+     */
+    private fun hasVpnConsent(): Boolean =
+        try {
+            VpnService.prepare(this) == null
+        } catch (e: Throwable) {
+            logw("prepare() check failed", e)
+            true
+        }
+
+    /**
+     * Stand down for another VPN client. Reported as a plain disconnect rather
+     * than an error: the user deliberately started the other VPN, so there is
+     * nothing here for them to fix.
+     */
+    private fun yieldToOtherVpn() {
+        revoked = true
+        logw("another VPN client owns the tunnel — standing down")
+        teardown(stopService = true)
     }
 
     private fun registerNetworkCallback() {
@@ -366,8 +438,16 @@ class AwgVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        // User replaced us with another VPN / revoked consent.
-        teardown(stopService = true)
+        // Another VPN app took the slot, or the user cleared our consent. Flag it
+        // and stop the poller before anything else: the flags are what stop an
+        // in-flight restart from grabbing the tunnel back.
+        revoked = true
+        running = false
+        generation++
+        logw("VPN slot revoked — yielding")
+        // teardown() waits on the lock a running connect() may still hold, so it
+        // must not run on the main thread.
+        Thread({ teardown(stopService = true) }, "AwgRevoke").start()
         super.onRevoke()
     }
 
@@ -482,6 +562,9 @@ class AwgVpnService : VpnService() {
         private const val NOTIF_ID = 1001
         private const val STALL_SECONDS = 180L
         private const val POLL_MS = 2000L
+        // Breather between tearing the old tunnel down and dialling again, so the
+        // socket and route churn settles first.
+        private const val RESTART_DELAY_MS = 600L
         // Max time an initial connect may sit without a handshake before we give
         // up and report an error (instead of spinning "Подключение…" forever).
         private const val CONNECT_TIMEOUT_MS = 20000L

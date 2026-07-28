@@ -6,6 +6,10 @@ import 'key_codec.dart';
 ///
 /// The ordering matters: interface device keys first, then `replace_peers`,
 /// then each peer beginning with `public_key`. Keys are emitted as hex.
+///
+/// Covers AmneziaWG 2.0 (Jc/S/H/I) and 3.0 (header protection, content padding,
+/// timings). Optional knobs are omitted when absent rather than sent as zero,
+/// because the backend fails the entire config on an unknown or invalid key.
 class UapiSerializer {
   const UapiSerializer({KeyCodec keyCodec = const KeyCodec()})
       : _keys = keyCodec;
@@ -36,6 +40,20 @@ class UapiSerializer {
     _str(sb, 'i4', p.i4);
     _str(sb, 'i5', p.i5);
 
+    // AWG 3.0. Emitted only when the config actually carries them: an AWG 2.0
+    // server never sends these, and the backend rejects the whole config on an
+    // unknown device key, so silence is what keeps 2.0 profiles working.
+    final hpk = p.headerProtectionKey?.trim();
+    if (hpk != null && hpk.isNotEmpty) {
+      sb.writeln('header_protection_key=${_keys.base64ToHex(hpk)}');
+    }
+    _str(sb, 'content_padding_addition', p.contentPaddingAddition);
+    _str(sb, 'rekey_after_time', p.rekeyAfterTime);
+    _str(sb, 'rekey_timeout', p.rekeyTimeout);
+    _str(sb, 'reject_after_time', p.rejectAfterTime);
+    _str(sb, 'keepalive_timeout', p.keepaliveTimeout);
+    _str(sb, 'max_handshake_attempts', p.maxHandshakeAttempts);
+
     sb.writeln('replace_peers=true');
 
     for (final peer in config.peers) {
@@ -47,9 +65,7 @@ class UapiSerializer {
       if (ep != null) {
         sb.writeln('endpoint=${ep.toString()}');
       }
-      if (peer.persistentKeepalive != null) {
-        sb.writeln('persistent_keepalive_interval=${peer.persistentKeepalive}');
-      }
+      _str(sb, 'persistent_keepalive_interval', peer.persistentKeepalive);
       for (final ip in peer.allowedIps) {
         sb.writeln('allowed_ip=$ip');
       }

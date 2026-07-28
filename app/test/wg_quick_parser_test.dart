@@ -48,8 +48,42 @@ PersistentKeepalive = 25
     expect(p.endpoint?.host, 'vpn.example.com');
     expect(p.endpoint?.port, 586);
     expect(p.allowedIps, ['0.0.0.0/0', '::/0']);
-    expect(p.persistentKeepalive, 25);
+    expect(p.persistentKeepalive, '25');
+    expect(i.parameters.isV3, isFalse);
     expect(cfg.isFullTunnel, isTrue);
+  });
+
+  test('parses AWG 3.0 header protection, padding and timings', () {
+    final hpk = base64.encode(List<int>.filled(32, 3));
+    final cfg = parser.parse('''
+[Interface]
+PrivateKey = $priv
+Address = 10.8.0.2/32
+S1 = 8
+HeaderProtectionKey = $hpk
+ContentPaddingAddition = 10-30
+RekeyAfterTime = 120
+RekeyTimeout = 5
+RejectAfterTime = 180
+KeepaliveTimeout = 10-15
+MaxHandshakeAttempts = 18
+
+[Peer]
+PublicKey = $pub
+AllowedIPs = 0.0.0.0/0
+PersistentKeepalive = 22-30
+''');
+
+    final p = cfg.interface.parameters;
+    expect(p.headerProtectionKey, hpk);
+    expect(p.contentPaddingAddition, '10-30');
+    expect(p.rekeyAfterTime, '120');
+    expect(p.rekeyTimeout, '5');
+    expect(p.rejectAfterTime, '180');
+    expect(p.keepaliveTimeout, '10-15');
+    expect(p.maxHandshakeAttempts, '18');
+    expect(p.isV3, isTrue);
+    expect(cfg.peers.single.persistentKeepalive, '22-30');
   });
 
   test('keeps scripted I-values with spaces verbatim', () {

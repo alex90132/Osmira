@@ -4,9 +4,11 @@ import '../../domain/entities/awg_config.dart';
 /// Parses awg-quick / wg-quick configuration text into an [AwgConfig].
 ///
 /// Understands the full AmneziaWG 2.0 key set (Jc/Jmin/Jmax, S1..S4,
-/// H1..H4, I1..I5) in addition to standard WireGuard keys. Critically, I1..I5
-/// values (e.g. `<b 0x01><r 74><t>`) contain spaces and are kept verbatim —
-/// only list-valued keys (Address/DNS/AllowedIPs) are comma-split.
+/// H1..H4, I1..I5) and the 3.0 additions (HeaderProtectionKey,
+/// ContentPaddingAddition and the timing knobs) in addition to standard
+/// WireGuard keys. Critically, I1..I5 values (e.g. `<b 0x01><r 74><t>`)
+/// contain spaces and are kept verbatim — only list-valued keys
+/// (Address/DNS/AllowedIPs) are comma-split.
 class WgQuickParser {
   const WgQuickParser();
 
@@ -70,6 +72,8 @@ class WgQuickParser {
     int? mtu;
     int? jc, jmin, jmax, s1, s2, s3, s4;
     String? h1, h2, h3, h4, i1, i2, i3, i4, i5;
+    String? hpk, contentPadding, rekeyAfter, rekeyTimeout, rejectAfter;
+    String? keepaliveTimeout, maxHandshakes;
 
     for (final e in lines) {
       switch (e.key) {
@@ -117,6 +121,20 @@ class WgQuickParser {
           i4 = e.value;
         case 'i5':
           i5 = e.value;
+        case 'headerprotectionkey':
+          hpk = e.value;
+        case 'contentpaddingaddition':
+          contentPadding = e.value;
+        case 'rekeyaftertime':
+          rekeyAfter = e.value;
+        case 'rekeytimeout':
+          rekeyTimeout = e.value;
+        case 'rejectaftertime':
+          rejectAfter = e.value;
+        case 'keepalivetimeout':
+          keepaliveTimeout = e.value;
+        case 'maxhandshakeattempts':
+          maxHandshakes = e.value;
         default:
           // Ignore unknown/host-only keys (e.g. Table, PreUp) for robustness.
           break;
@@ -150,6 +168,13 @@ class WgQuickParser {
         i3: i3,
         i4: i4,
         i5: i5,
+        headerProtectionKey: hpk,
+        contentPaddingAddition: contentPadding,
+        rekeyAfterTime: rekeyAfter,
+        rekeyTimeout: rekeyTimeout,
+        rejectAfterTime: rejectAfter,
+        keepaliveTimeout: keepaliveTimeout,
+        maxHandshakeAttempts: maxHandshakes,
       ),
     );
   }
@@ -159,7 +184,7 @@ class WgQuickParser {
     String? psk;
     Endpoint? endpoint;
     final allowed = <String>[];
-    int? keepalive;
+    String? keepalive;
 
     for (final e in lines) {
       switch (e.key) {
@@ -172,7 +197,7 @@ class WgQuickParser {
         case 'allowedips':
           allowed.addAll(_csv(e.value));
         case 'persistentkeepalive':
-          keepalive = int.tryParse(e.value);
+          keepalive = e.value;
         default:
           break;
       }

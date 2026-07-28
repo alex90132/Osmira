@@ -14,7 +14,7 @@ class KeyCodec {
   String base64ToHex(String base64Key) {
     final Uint8List bytes;
     try {
-      bytes = base64.decode(base64Key.trim());
+      bytes = base64.decode(_normalize(base64Key));
     } catch (e) {
       throw ConfigParseFailure('Invalid base64 key', e);
     }
@@ -26,5 +26,18 @@ class KeyCodec {
       sb.write(b.toRadixString(16).padLeft(2, '0'));
     }
     return sb.toString();
+  }
+
+  /// Accepts the key spellings that show up in the wild and returns padded,
+  /// standard-alphabet base64.
+  ///
+  /// Amnezia 3.0 emits `HeaderProtectionKey` unpadded (43 chars for 32 bytes),
+  /// unlike the 44-char padded WireGuard keys next to it, and Dart's decoder
+  /// rejects both missing padding and the url-safe alphabet.
+  static String _normalize(String key) {
+    final cleaned = key.trim().replaceAll('-', '+').replaceAll('_', '/');
+    final remainder = cleaned.length % 4;
+    if (remainder == 0) return cleaned;
+    return cleaned + '=' * (4 - remainder);
   }
 }

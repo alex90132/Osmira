@@ -1,7 +1,7 @@
 <h1 align="center">Osmira</h1>
 
 <p align="center">
-  A simple <b>AmneziaWG (AWG 2.0)</b> VPN client for Android.<br/>
+  A simple <b>AmneziaWG (AWG 3.0)</b> VPN client for Android.<br/>
   Drop in a <code>.vpn</code> config, pick which apps go through the tunnel, and forget about it.
 </p>
 
@@ -13,7 +13,7 @@
 <p align="center">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
   <img alt="Platform: Android" src="https://img.shields.io/badge/platform-Android%209%2B-3ddc84">
-  <img alt="Protocol: AmneziaWG" src="https://img.shields.io/badge/protocol-AmneziaWG%202.0-3b82f6">
+  <img alt="Protocol: AmneziaWG" src="https://img.shields.io/badge/protocol-AmneziaWG%203.0-3b82f6">
 </p>
 
 <p align="center">
@@ -24,9 +24,12 @@
 ## What it does
 
 Osmira uses AmneziaWG. It's WireGuard with an obfuscation layer, so the
-handshake doesn't stand out on the wire. All AWG2 fields are supported:
-`Jc/Jmin/Jmax`, `S1-S4`, `H1-H4`, `I1-I5`. There isn't much to it: import a
-config, tap connect, and it stays up.
+handshake doesn't stand out on the wire. All AWG2 fields are supported
+(`Jc/Jmin/Jmax`, `S1-S4`, `H1-H4`, `I1-I5`) plus AWG3: header protection
+(`HeaderProtectionKey`), data padding (`ContentPaddingAddition`) and tunable
+handshake timings (`RekeyAfterTime`, `RekeyTimeout`, `RejectAfterTime`,
+`KeepaliveTimeout`, `MaxHandshakeAttempts`), ranges like `20-30` included.
+There isn't much to it: import a config, tap connect, and it stays up.
 
 - **Import anything AmneziaWG.** Open a `.vpn` file, paste a `vpn://` link, or
   point it at a plain `.conf`.

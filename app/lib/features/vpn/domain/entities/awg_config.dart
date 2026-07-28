@@ -31,8 +31,17 @@ class Endpoint {
 /// `Jc/Jmin/Jmax` (junk packets), `S1..S4` (junk sizes prepended to the four
 /// packet kinds), `H1..H4` (magic headers, single value or `min-max` range in
 /// AWG 2.0) and `I1..I5` (fully scripted "special junk" packets — a 2.0
-/// feature, e.g. `<b 0x..><r 74><t>`). Everything is optional; a plain
-/// WireGuard config simply leaves them all null.
+/// feature, e.g. `<b 0x..><r 74><t>`).
+///
+/// AWG 3.0 adds [headerProtectionKey] (encrypts the low-entropy header fields
+/// WireGuard leaves in the clear), [contentPaddingAddition] (extra padding on
+/// data packets) and the five timing knobs ([rekeyAfterTime] …
+/// [maxHandshakeAttempts]) that override WireGuard's hardcoded timers so the
+/// handshake cadence itself stops being a fingerprint.
+///
+/// Everything is optional; a plain WireGuard config leaves them all null. The
+/// 3.0 knobs other than the key are `range` strings (`"a"`, `"a-b"` or
+/// `"(off)"`) and are passed through to the backend verbatim.
 @immutable
 class AwgParameters {
   const AwgParameters({
@@ -52,6 +61,13 @@ class AwgParameters {
     this.i3,
     this.i4,
     this.i5,
+    this.headerProtectionKey,
+    this.contentPaddingAddition,
+    this.rekeyAfterTime,
+    this.rekeyTimeout,
+    this.rejectAfterTime,
+    this.keepaliveTimeout,
+    this.maxHandshakeAttempts,
   });
 
   final int? jc;
@@ -71,6 +87,18 @@ class AwgParameters {
   final String? i4;
   final String? i5;
 
+  /// AWG 3.0: base64 32-byte key for header protection. Emitted as hex in uapi.
+  final String? headerProtectionKey;
+
+  /// AWG 3.0: extra padding range applied to data packets.
+  final String? contentPaddingAddition;
+
+  final String? rekeyAfterTime;
+  final String? rekeyTimeout;
+  final String? rejectAfterTime;
+  final String? keepaliveTimeout;
+  final String? maxHandshakeAttempts;
+
   bool get isEmpty =>
       jc == null &&
       jmin == null &&
@@ -87,7 +115,8 @@ class AwgParameters {
       i2 == null &&
       i3 == null &&
       i4 == null &&
-      i5 == null;
+      i5 == null &&
+      !isV3;
 
   /// True when 2.0-only knobs are present (S3/S4, header ranges, or I1..I5).
   bool get isV2 =>
@@ -103,7 +132,20 @@ class AwgParameters {
       _isRange(h3) ||
       _isRange(h4);
 
+  /// True when 3.0-only knobs are present (header protection, content padding
+  /// or custom timings).
+  bool get isV3 =>
+      _has(headerProtectionKey) ||
+      _has(contentPaddingAddition) ||
+      _has(rekeyAfterTime) ||
+      _has(rekeyTimeout) ||
+      _has(rejectAfterTime) ||
+      _has(keepaliveTimeout) ||
+      _has(maxHandshakeAttempts);
+
   static bool _isRange(String? v) => v != null && v.contains('-');
+
+  static bool _has(String? v) => v != null && v.trim().isNotEmpty;
 }
 
 /// The `[Interface]` section of an AmneziaWG config.
@@ -156,7 +198,10 @@ class AwgPeer {
   /// Allowed IPs as `ip/prefix` strings. These double as the OS routes.
   final List<String> allowedIps;
 
-  final int? persistentKeepalive;
+  /// Keepalive interval in seconds. Kept as a string because AWG 3.0 allows a
+  /// `min-max` range (e.g. `22-30`) so the interval itself is not a constant
+  /// that DPI can lock onto.
+  final String? persistentKeepalive;
 }
 
 /// A complete AmneziaWG configuration (one interface + one or more peers).

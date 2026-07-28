@@ -165,6 +165,13 @@ class AmneziaConfigParser {
           i3: str('I3'),
           i4: str('I4'),
           i5: str('I5'),
+          headerProtectionKey: str('HeaderProtectionKey'),
+          contentPaddingAddition: str('ContentPaddingAddition'),
+          rekeyAfterTime: str('RekeyAfterTime'),
+          rekeyTimeout: str('RekeyTimeout'),
+          rejectAfterTime: str('RejectAfterTime'),
+          keepaliveTimeout: str('KeepaliveTimeout'),
+          maxHandshakeAttempts: str('MaxHandshakeAttempts'),
         ),
       ),
       peers: [
@@ -175,7 +182,7 @@ class AmneziaConfigParser {
               ? Endpoint(host: host, port: port)
               : null,
           allowedIps: allowedIps,
-          persistentKeepalive: intOf('persistent_keep_alive'),
+          persistentKeepalive: str('persistent_keep_alive'),
         ),
       ],
     );

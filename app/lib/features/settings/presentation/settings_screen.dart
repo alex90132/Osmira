@@ -6,7 +6,7 @@ import 'settings_controller.dart';
 
 /// Displayed at the bottom of Settings, vk-bridge style. Keep in sync with the
 /// `version:` field in pubspec.yaml.
-const _appVersionLabel = 'Osmira 0.1.5';
+const _appVersionLabel = 'Osmira 0.1.6';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});

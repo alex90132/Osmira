@@ -59,7 +59,8 @@ class VpnConnectionRepositoryImpl implements VpnConnectionRepository {
       () => 'mtu=$mtu dns=${cfg.interface.dnsServers} '
           'routes=${routes.length} peers=${cfg.peers.length} '
           'endpoint=${peer?.endpoint?.host}:${peer?.endpoint?.port} '
-          'awg2=${cfg.interface.parameters.isV2}',
+          'awg2=${cfg.interface.parameters.isV2} '
+          'awg3=${cfg.interface.parameters.isV3}',
     );
 
     return {

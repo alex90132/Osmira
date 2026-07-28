@@ -79,7 +79,9 @@ class TunnelCard extends StatelessWidget {
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      if (tunnel.config.interface.parameters.isV2)
+                      if (tunnel.config.interface.parameters.isV3)
+                        const _Tag(label: 'AWG 3.0', highlight: true)
+                      else if (tunnel.config.interface.parameters.isV2)
                         const _Tag(label: 'AWG 2.0', highlight: true)
                       else if (!tunnel.config.interface.parameters.isEmpty)
                         const _Tag(label: 'AWG'),
